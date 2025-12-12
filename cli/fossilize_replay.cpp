@@ -1523,7 +1523,7 @@ struct ThreadedReplayer : StateCreatorInterface
 		if (result == VK_PIPELINE_COMPILE_REQUIRED)
 		{
 			graphics_pipeline_compile_required_count.fetch_add(1, std::memory_order_relaxed);
-			LOGE("Recompile required for graphics pipeline hash 0x%016" PRIx64 ".\n", work_item.hash);
+			//LOGE("Recompile required for graphics pipeline hash 0x%016" PRIx64 ".\n", work_item.hash);
 
 			if (!opts.skip_pipelines_on_compile_required)
 			{
@@ -1542,6 +1542,8 @@ struct ThreadedReplayer : StateCreatorInterface
 
 			graphics_pipeline_ns.fetch_add(duration_ns, std::memory_order_relaxed);
 			graphics_pipeline_count.fetch_add(1, std::memory_order_relaxed);
+
+			time_per_graphics_pipeline_ns[Global::worker_thread_index][work_item.hash] = duration_ns;
 
 			if (primary)
 			{
@@ -1587,7 +1589,7 @@ struct ThreadedReplayer : StateCreatorInterface
 		if (result == VK_PIPELINE_COMPILE_REQUIRED)
 		{
 			compute_pipeline_compile_required_count.fetch_add(1, std::memory_order_relaxed);
-			LOGE("Recompile required for compute pipeline hash 0x%016" PRIx64 ".\n", work_item.hash);
+			//LOGE("Recompile required for compute pipeline hash 0x%016" PRIx64 ".\n", work_item.hash);
 
 			if (!opts.skip_pipelines_on_compile_required)
 			{
@@ -1607,6 +1609,7 @@ struct ThreadedReplayer : StateCreatorInterface
 			compute_pipeline_ns.fetch_add(duration_ns, std::memory_order_relaxed);
 			compute_pipeline_count.fetch_add(1, std::memory_order_relaxed);
 
+			time_per_compute_pipeline_ns[Global::worker_thread_index][work_item.hash] = duration_ns;
 			if (primary)
 			{
 				if (opts.pipeline_stats)
@@ -1651,7 +1654,7 @@ struct ThreadedReplayer : StateCreatorInterface
 		if (result == VK_PIPELINE_COMPILE_REQUIRED)
 		{
 			raytracing_pipeline_compile_required_count.fetch_add(1, std::memory_order_relaxed);
-			LOGE("Recompile required for raytracing pipeline hash 0x%016" PRIx64 ".\n", work_item.hash);
+			//LOGE("Recompile required for raytracing pipeline hash 0x%016" PRIx64 ".\n", work_item.hash);
 
 			if (!opts.skip_pipelines_on_compile_required)
 			{
@@ -2435,6 +2438,7 @@ struct ThreadedReplayer : StateCreatorInterface
 			auto end_time = chrono::steady_clock::now();
 			auto duration_ns = chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count();
 			shader_module_ns.fetch_add(duration_ns, std::memory_order_relaxed);
+			//time_per_hash_ns[hash] = duration_ns;
 
 			if (!ret)
 			{
@@ -2493,6 +2497,17 @@ struct ThreadedReplayer : StateCreatorInterface
 				auto duration_ns = chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count();
 				shader_module_ns.fetch_add(duration_ns, std::memory_order_relaxed);
 				shader_module_count.fetch_add(1, std::memory_order_relaxed);
+				
+				//time_per_hash_ns[hash] = duration_ns;
+				//{
+				//lock_guard<mutex> lock(time_per_hash_lock);
+                //auto newInsertValue = duration_ns;
+				//auto itFound = time_per_hash_ns.find(hash);
+				//if (itFound != time_per_hash_ns.end()) {
+				//	newInsertValue = newInsertValue + itFound->second;
+				//}
+				//time_per_hash_ns[hash] = newInsertValue;
+				//}
 
 				if (robustness)
 				{
@@ -3559,6 +3574,9 @@ struct ThreadedReplayer : StateCreatorInterface
 	std::atomic<std::uint64_t> compute_pipeline_ns;
 	std::atomic<std::uint64_t> raytracing_pipeline_ns;
 	std::atomic<std::uint64_t> shader_module_ns;
+	std::mutex time_per_hash_lock;
+	std::unordered_map<Hash, uint64_t> time_per_graphics_pipeline_ns[32];
+	std::unordered_map<Hash, uint64_t> time_per_compute_pipeline_ns[32];
 	std::atomic<std::uint64_t> total_idle_ns;
 	std::atomic<std::uint64_t> thread_total_ns;
 	std::atomic<std::uint32_t> graphics_pipeline_count;
@@ -4475,6 +4493,28 @@ static int run_normal_process(ThreadedReplayer &replayer, const vector<const cha
 	LOGI("Playing back %u shader modules took %.3f s (accumulated time)\n",
 	     replayer.shader_module_count.load(),
 	     replayer.shader_module_ns.load() * 1e-9);
+
+    LOGGLV("\n\n\n");
+
+	for (int ii = 0; ii < 16; ii++) {
+		for (auto it = replayer.time_per_graphics_pipeline_ns[ii].begin(); it != replayer.time_per_graphics_pipeline_ns[ii].end(); it++)
+		{
+			auto hashVal = static_cast<unsigned long long>(it->first);
+			auto timeinMs  = (it->second) * 1e-9;
+			LOGGLV("graphics pipeline hash 0x%016" PRIx64 "  TIME = %.3fs \n", hashVal, timeinMs);
+		}
+	}
+
+	for (int ii = 0 ; ii < 16; ii++) {
+		for (auto it = replayer.time_per_compute_pipeline_ns[ii].begin(); it != replayer.time_per_compute_pipeline_ns[ii].end(); it++)
+		{
+			auto hashVal = static_cast<unsigned long long>(it->first);
+			auto timeinMs  = (it->second) * 1e-9;
+			LOGGLV("compute pipeline hash 0x%016" PRIx64 "  TIME = %.3fs \n", hashVal, timeinMs);
+		}
+	}
+
+    LOGGLV("\n\n\n");
 
 	LOGI("Shader cache evicted %u shader modules in total\n",
 	     replayer.shader_module_evicted_count.load());

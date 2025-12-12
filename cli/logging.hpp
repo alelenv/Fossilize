@@ -38,6 +38,7 @@
 } while(0)
 #else
 #include <stdio.h>
+#define LOGGLV(...) do { fprintf(stderr, "GLV: " __VA_ARGS__); fflush(stderr); } while(0)
 #define LOGI(...) do { fprintf(stderr, "Fossilize INFO: " __VA_ARGS__); fflush(stderr); } while(0)
 #define LOGW(...) do { fprintf(stderr, "Fossilize WARN: " __VA_ARGS__); fflush(stderr); } while(0)
 #define LOGE(...) do { fprintf(stderr, "Fossilize ERROR: " __VA_ARGS__); fflush(stderr); } while(0)
