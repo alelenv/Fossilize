@@ -3575,8 +3575,8 @@ struct ThreadedReplayer : StateCreatorInterface
 	std::atomic<std::uint64_t> raytracing_pipeline_ns;
 	std::atomic<std::uint64_t> shader_module_ns;
 	std::mutex time_per_hash_lock;
-	std::unordered_map<Hash, uint64_t> time_per_graphics_pipeline_ns[32];
-	std::unordered_map<Hash, uint64_t> time_per_compute_pipeline_ns[32];
+	std::unordered_map<Hash, uint64_t> time_per_graphics_pipeline_ns[128];
+	std::unordered_map<Hash, uint64_t> time_per_compute_pipeline_ns[128];
 	std::atomic<std::uint64_t> total_idle_ns;
 	std::atomic<std::uint64_t> thread_total_ns;
 	std::atomic<std::uint32_t> graphics_pipeline_count;
@@ -4496,7 +4496,7 @@ static int run_normal_process(ThreadedReplayer &replayer, const vector<const cha
 
     LOGGLV("\n\n\n");
 
-	for (int ii = 0; ii < 16; ii++) {
+	for (int ii = 0; ii < 128; ii++) {
 		for (auto it = replayer.time_per_graphics_pipeline_ns[ii].begin(); it != replayer.time_per_graphics_pipeline_ns[ii].end(); it++)
 		{
 			auto hashVal = static_cast<unsigned long long>(it->first);
@@ -4505,7 +4505,7 @@ static int run_normal_process(ThreadedReplayer &replayer, const vector<const cha
 		}
 	}
 
-	for (int ii = 0 ; ii < 16; ii++) {
+	for (int ii = 0 ; ii < 128; ii++) {
 		for (auto it = replayer.time_per_compute_pipeline_ns[ii].begin(); it != replayer.time_per_compute_pipeline_ns[ii].end(); it++)
 		{
 			auto hashVal = static_cast<unsigned long long>(it->first);
